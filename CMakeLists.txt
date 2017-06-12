@@ -14,6 +14,8 @@ set(sources src/MPC.cpp src/main.cpp)
 include_directories(/usr/local/include)
 link_directories(/usr/local/lib)
 include_directories(src/Eigen-3.3)
+include_directories(../Ipopt-3.12.1/include)
+link_directories(../Ipopt-3.12.1/lib)
 
 if(${CMAKE_SYSTEM_NAME} MATCHES "Darwin")
 
