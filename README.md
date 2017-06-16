@@ -3,7 +3,7 @@ Self-Driving Car Engineer Nanodegree Program
 
 ---
 
-# Please update the CMake file to point to the correct location of Ipopt. The current CMakeLists.txt expect Ipopt to be installed in <source_directory>/Ipopt/Ipopt/Ipopt
+# Please update the CMakeLists.txt file to point to the correct location of Ipopt. The current CMakeLists.txt expect Ipopt to be installed in <source_directory>/Ipopt/Ipopt/Ipopt
 
 ## The Model
 The vehicle state consists of current position in x and y coordinates, the heading direction of the vehicle and the speed of the vehicle. The actuations include the steering angle and the acceleration or throttle. Given the heading direction and velocity, the position of the vehicle at a future point in time can be calculated.
