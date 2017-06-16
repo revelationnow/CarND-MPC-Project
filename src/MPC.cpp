@@ -6,7 +6,7 @@
 using CppAD::AD;
 
 // TODO: Set the timestep length and duration
-size_t N = 25;
+size_t N = 15;
 double dt = 0.05;
 size_t x_start = 0;
 size_t y_start = x_start + N;
@@ -16,7 +16,7 @@ size_t cte_start = v_start + N;
 size_t epsi_start = cte_start + N;
 size_t delta_start = epsi_start + N;
 size_t a_start = delta_start + N - 1;
-double ref_v = 40;
+double ref_v = 60;
 // This value assumes the model presented in the classroom is used.
 //
 // It was obtained by measuring the radius formed by running the vehicle in the
@@ -54,14 +54,14 @@ class FG_eval {
 
     // Minimize the use of actuators.
     for (size_t t = 0; t < N - 1; t++) {
-      fg[0] += CppAD::pow(vars[delta_start + t], 2);
-      fg[0] += CppAD::pow(vars[a_start + t], 2);
+      fg[0] += 200 * CppAD::pow(vars[delta_start + t], 2);
+      fg[0] += 1* CppAD::pow(vars[a_start + t], 2);
     }
 
     // Minimize the value gap between sequential actuations.
     for (size_t t = 0; t < N - 2; t++) {
-      fg[0] += CppAD::pow(vars[delta_start + t + 1] - vars[delta_start + t], 2);
-      fg[0] += CppAD::pow(vars[a_start + t + 1] - vars[a_start + t], 2);
+      fg[0] += 200* CppAD::pow(vars[delta_start + t + 1] - vars[delta_start + t], 2);
+      fg[0] += 1 * CppAD::pow(vars[a_start + t + 1] - vars[a_start + t], 2);
     }
 
     //
@@ -103,8 +103,8 @@ class FG_eval {
       AD<double> delta0 = vars[delta_start + t - 1];
       AD<double> a0 = vars[a_start + t - 1];
 
-      AD<double> f0 = coeffs[0] + coeffs[1] * x0;
-      AD<double> psides0 = CppAD::atan(coeffs[1]);
+      AD<double> f0 = coeffs[0] + coeffs[1] * x0 + coeffs[2] * x0*x0 + coeffs[3] * x0 * x0 * x0;
+      AD<double> psides0 = CppAD::atan(coeffs[1] + 2 * coeffs[2] * x0 + 3 * coeffs[3] * x0 * x0);
 
       // Here's `x` to get you started.
       // The idea here is to constraint this value to be 0.
@@ -131,11 +131,11 @@ class FG_eval {
 //
 // MPC class definition implementation.
 //
-MPC::MPC() {}
 MPC::~MPC() {}
 
 vector<double> MPC::Solve(Eigen::VectorXd state, Eigen::VectorXd coeffs) {
   bool ok = true;
+  size_t latency = 2;
   typedef CPPAD_TESTVECTOR(double) Dvector;
   double x = state[0];
   double y = state[1];
@@ -178,16 +178,28 @@ vector<double> MPC::Solve(Eigen::VectorXd state, Eigen::VectorXd coeffs) {
   // The upper and lower limits of delta are set to -25 and 25
   // degrees (values in radians).
   // NOTE: Feel free to change this to something else.
-  for (size_t i = delta_start; i < a_start; i++) {
+  for (size_t i = delta_start; i < a_start - latency; i++) {
     vars_lowerbound[i] = -0.436332;
     vars_upperbound[i] = 0.436332;
   }
 
+  for(size_t i = a_start - latency; i < a_start; i++)
+  {
+    vars_lowerbound[i] = prev_delta;
+    vars_upperbound[i] = prev_delta;
+  }
+
   // Acceleration/decceleration upper and lower limits.
   // NOTE: Feel free to change this to something else.
-  for (size_t i = a_start; i < n_vars; i++) {
+  for (size_t i = a_start; i < n_vars - latency; i++) {
     vars_lowerbound[i] = -1.0;
     vars_upperbound[i] = 1.0;
+  }
+
+  for(size_t i = n_vars - latency; i < n_vars; i++)
+  {
+    vars_lowerbound[i] = prev_acc;
+    vars_upperbound[i] = prev_acc;
   }
 
   for (size_t i = 0; i < n_constraints; i++) {
@@ -244,6 +256,20 @@ vector<double> MPC::Solve(Eigen::VectorXd state, Eigen::VectorXd coeffs) {
   auto cost = solution.obj_value;
   std::cout << "Cost " << cost << std::endl;
 
+  if(pred_x.size() == 0)
+  {
+    pred_x.resize(N-1);
+    pred_y.resize(N-1);
+  }
+
+  for(int i = 1; i < N; i++)
+  {
+    pred_x[i-1] = solution.x[x_start + i ];
+    pred_y[i-1] = solution.x[y_start + i ];
+  }
+  prev_delta = solution.x[delta_start + latency];
+  prev_acc = solution.x[a_start + latency];
+
   // TODO: Return the first actuator values. The variables can be accessed with
   // `solution.x[i]`.
   //
@@ -252,5 +278,5 @@ vector<double> MPC::Solve(Eigen::VectorXd state, Eigen::VectorXd coeffs) {
   return {solution.x[x_start + 1],   solution.x[y_start + 1],
           solution.x[psi_start + 1], solution.x[v_start + 1],
           solution.x[cte_start + 1], solution.x[epsi_start + 1],
-          solution.x[delta_start],   solution.x[a_start]};
+          solution.x[delta_start + latency],   solution.x[a_start + latency]};
 }
